@@ -1,0 +1,23 @@
+name: Deploy PDBot Webhook to DO
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Executando deploy via SSH
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.DO_HOST }}
+          username: ${{ secrets.DO_USER }}
+          key: ${{ secrets.DO_SSH_KEY }}
+          script: |
+            cd /var/www/pdbot-webhook-relay
+            git pull origin main
+            npm install
+            npm run build
+            pm2 restart pdbot-webhook || pm2 start ecosystem.config.js
+            pm2 save
