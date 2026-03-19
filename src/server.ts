@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
+import { read } from 'node:fs';
 
 const app = express();
 app.use(cors());
@@ -33,6 +34,7 @@ app.post('/webhook/judit', async (req, res) => {
 
     try {
         const body = req.body;
+        console.log(`[Webhook] 🔔 Evento recebido: ${body}`);
         
         // Extrai o ID e o Evento com base na documentação real da Judit
         const requestId = body.reference_id || (body.payload && body.payload.origin_id);
