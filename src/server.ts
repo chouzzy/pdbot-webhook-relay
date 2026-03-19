@@ -18,42 +18,47 @@ const JuditRequestSchema = new mongoose.Schema({
     processos: { type: Array, default: [] },
     updated_at: { type: Date, default: Date.now }
 });
+
 const JuditRequest = mongoose.model('JuditRequest', JuditRequestSchema);
+
+// Rota de Teste de Vida
 app.get('/', (req, res) => {
     res.json({ message: 'Welcome to PDBot Webhook Relay', status: 'running' });
 });
 
+// Webhook Endpoint
 app.post('/webhook/judit', async (req, res) => {
-    // 1. Resposta rápida para a Judit não dar timeout e parar de enviar
+    // Responde rápido para a Judit não dar timeout
     res.status(200).send('Received');
 
     try {
         const body = req.body;
         
-        // 2. Extração inteligente baseada no log do webhook.site
+        // Extrai o ID e o Evento com base na documentação real da Judit
         const requestId = body.reference_id || (body.payload && body.payload.origin_id);
-        const eventType = body.event_type; // ex: "response_created", "request_completed"
+        const eventType = body.event_type;
         
         if (!requestId) {
             console.log(`[Webhook] ⚠️ POST ignorado (Sem Request ID)`);
             return;
         }
 
-        console.log(`[Webhook] 📥 Evento: ${eventType} | ID: ${requestId}`);
+        const payloadType = body.payload ? body.payload.response_type : 'desconhecido';
+        console.log(`[Webhook] 📥 Evento: ${eventType} | Tipo: ${payloadType} | ID: ${requestId}`);
 
-        // 3. CAPTURA DE PROCESSOS (O JSON que você mandou cai aqui)
+        // CASO 1: A Judit enviou um processo (lawsuit)
         if (eventType === 'response_created' && body.payload && body.payload.response_type === 'lawsuit') {
             const processoJudicial = body.payload.response_data;
             
             if (processoJudicial) {
-                // Traduz o JSON cru da Judit para o formato que o seu Front-end já espera
+                // Formata o processo para o Front-end ler sem quebrar
                 const processoFormatado = {
                     numero_processo: processoJudicial.code || 'N/A',
                     tribunal: processoJudicial.tribunal_acronym || 'N/A',
                     descricao: processoJudicial.classifications?.[0]?.name || processoJudicial.name || 'Ação Judicial',
                     assunto: processoJudicial.subjects?.[0]?.name || 'N/A',
                     data_distribuicao: processoJudicial.distribution_date ? new Date(processoJudicial.distribution_date).toLocaleDateString('pt-BR') : 'N/A',
-                    status: 'Ativo', // A Judit crua nem sempre manda status claro aqui
+                    status: 'Ativo',
                     valor_causa: processoJudicial.amount ? `R$ ${processoJudicial.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : undefined,
                     partes: (processoJudicial.parties || []).map((part: any) => ({
                         nome: part.name,
@@ -66,7 +71,7 @@ app.post('/webhook/judit', async (req, res) => {
                     { request_id: requestId },
                     { 
                         $push: { processos: processoFormatado },
-                        $set: { updated_at: new Date(), status: 'processing' }
+                        $set: { updated_at: new Date(), status: 'processing' } // Mantém processing enquanto chegam dados
                     },
                     { upsert: true }
                 );
@@ -74,15 +79,19 @@ app.post('/webhook/judit', async (req, res) => {
             }
         }
 
-        // 4. CAPTURA DO SINAL DE TÉRMINO
-        // A Judit dispara um event_type específico quando o crawler termina tudo
-        if (eventType === 'request_completed' || eventType === 'request_failed') {
-            await JuditRequest.findOneAndUpdate(
-                { request_id: requestId },
-                { status: eventType === 'request_completed' ? 'completed' : 'error', updated_at: new Date() },
-                { upsert: true }
-            );
-            console.log(`[Webhook] 🏁 Busca finalizada (Status: ${eventType}) para o ID: ${requestId}`);
+        // CASO 2: A Judit avisou que terminou de varrer os tribunais (application_info + REQUEST_COMPLETED)
+        if (eventType === 'response_created' && body.payload && body.payload.response_type === 'application_info') {
+            const appInfo = body.payload.response_data;
+            
+            // O código 600 é a "bandeira quadriculada" da Judit
+            if (appInfo && appInfo.message === 'REQUEST_COMPLETED') {
+                await JuditRequest.findOneAndUpdate(
+                    { request_id: requestId },
+                    { status: 'completed', updated_at: new Date() },
+                    { upsert: true }
+                );
+                console.log(`[Webhook] 🏁 Busca finalizada (Status: COMPLETED) para o ID: ${requestId}`);
+            }
         }
 
     } catch (error) {
