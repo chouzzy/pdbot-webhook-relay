@@ -19,8 +19,7 @@ const JuditRequestSchema = new mongoose.Schema({
     updated_at: { type: Date, default: Date.now }
 });
 const JuditRequest = mongoose.model('JuditRequest', JuditRequestSchema);
-app.get
-('/', (req, res) => {
+app.get('/', (req, res) => {
     res.json({ message: 'Welcome to PDBot Webhook Relay', status: 'running' });
 });
 
