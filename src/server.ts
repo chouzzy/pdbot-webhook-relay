@@ -19,9 +19,13 @@ const JuditRequestSchema = new mongoose.Schema({
     updated_at: { type: Date, default: Date.now }
 });
 const JuditRequest = mongoose.model('JuditRequest', JuditRequestSchema);
+app.get
+('/', (req, res) => {
+    res.json({ message: 'Welcome to PDBot Webhook Relay', status: 'running' });
+});
 
 // Webhook Endpoint
-app.post('/webhooks/judit', async (req, res) => {
+app.post('/webhook/judit', async (req, res) => {
     res.status(200).send('Received'); // Responde rápido para evitar timeout da Judit
 
     try {
