@@ -21,7 +21,7 @@ const JuditRequestSchema = new mongoose.Schema({
 const JuditRequest = mongoose.model('JuditRequest', JuditRequestSchema);
 
 // Webhook Endpoint
-app.post('/api/webhooks/judit', async (req, res) => {
+app.post('/webhooks/judit', async (req, res) => {
     res.status(200).send('Received'); // Responde rápido para evitar timeout da Judit
 
     try {
